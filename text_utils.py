@@ -8,7 +8,7 @@ import scipy.io as sio
 import os.path as osp
 import random, os
 import cv2
-import cPickle as cp
+import pickle as cp
 import scipy.signal as ssig
 import scipy.stats as sstat
 import pygame, pygame.locals
@@ -57,7 +57,7 @@ def crop_safe(arr, rect, bbs=[], pad=0):
     v1 = [min(arr.shape[0], rect[0]+rect[2]), min(arr.shape[1], rect[1]+rect[3])]
     arr = arr[v0[0]:v1[0],v0[1]:v1[1],...]
     if len(bbs) > 0:
-        for i in xrange(len(bbs)):
+        for i in range(len(bbs)):
             bbs[i,0] -= v0[0]
             bbs[i,1] -= v0[1]
         return arr, bbs
@@ -195,9 +195,9 @@ class RenderFont(object):
         # baseline state
         mid_idx = wl//2
         BS = self.baselinestate.get_sample()
-        curve = [BS['curve'](i-mid_idx) for i in xrange(wl)]
+        curve = [BS['curve'](i-mid_idx) for i in range(wl)]
         curve[mid_idx] = -np.sum(curve) / (wl-1)
-        rots  = [-int(math.degrees(math.atan(BS['diff'](i-mid_idx)/(font.size/2)))) for i in xrange(wl)]
+        rots  = [-int(math.degrees(math.atan(BS['diff'](i-mid_idx)/(font.size/2)))) for i in range(wl)]
 
         bbs = []
         # place middle char
@@ -213,7 +213,7 @@ class RenderFont(object):
         # render chars to the left and right:
         last_rect = rect
         ch_idx = []
-        for i in xrange(wl):
+        for i in range(wl):
             #skip the middle character
             if i==mid_idx: 
                 bbs.append(mid_ch_bb)
@@ -325,7 +325,7 @@ class RenderFont(object):
         """
         n,_ = bbs.shape
         coords = np.zeros((2,4,n))
-        for i in xrange(n):
+        for i in range(n):
             coords[:,:,i] = bbs[i,:2][:,None]
             coords[0,1,i] += bbs[i,2]
             coords[:,2,i] += bbs[i,2:4]
@@ -431,12 +431,12 @@ class FontState(object):
         font_model_path = osp.join(data_dir, 'models/font_px2pt.cp')
 
         # get character-frequencies in the English language:
-        with open(char_freq_path,'r') as f:
+        with open(char_freq_path,'rb') as f:
             self.char_freq = cp.load(f)
 
         # get the model to convert from pixel to font pt size:
-        with open(font_model_path,'r') as f:
-            self.font_model = cp.load(f)
+        with open(font_model_path,'rb') as f:
+            self.font_model = cp.load(f, encoding='latin1')
 
         # get the names of fonts to use:
         self.FONT_LIST = osp.join(data_dir, 'fonts/fontlist.txt')
@@ -455,7 +455,7 @@ class FontState(object):
         # get the [height,width] of each character:
         try:
             sizes = font.get_metrics(chars,size)
-            good_idx = [i for i in xrange(len(sizes)) if sizes[i] is not None]
+            good_idx = [i for i in range(len(sizes)) if sizes[i] is not None]
             sizes,w = [sizes[i] for i in good_idx], w[good_idx]
             sizes = np.array(sizes).astype('float')[:,[3,4]]
             r = np.abs(sizes[:,1]/sizes[:,0]) # width/height
@@ -558,11 +558,11 @@ class TextSource(object):
             # convert fs into chasen file
             _, ext = os.path.splitext(os.path.basename(fn))
             fn_chasen = fn.replace(ext, ".chasen")
-            print "Convert {} into {}".format(fn, fn_chasen)
+            print("Convert {} into {}".format(fn, fn_chasen))
 
             cmd = "mecab -Ochasen {} > {}".format(fn, fn_chasen)
-            print "The following cmd below was executed to convert into chasen (for Japanese)"
-            print "\t{}".format(cmd)
+            print("The following cmd below was executed to convert into chasen (for Japanese)")
+            print("\t{}".format(cmd))
             p = subprocess.call(cmd, shell=True)
             data = ChasenCorpusReader('./', fn_chasen, encoding='utf-8')
 
@@ -636,7 +636,7 @@ class TextSource(object):
         """
         ls = [len(l) for l in lines]
         max_l = max(ls)
-        for i in xrange(len(lines)):
+        for i in range(len(lines)):
             l = lines[i].strip()
             dl = max_l-ls[i]
             lspace = dl//2
@@ -708,7 +708,7 @@ class TextSource(object):
 
         # get number of words:
         nword = [self.p_line_nword[2]*sstat.beta.rvs(a=self.p_line_nword[0], b=self.p_line_nword[1])
-                 for _ in xrange(nline)]
+                 for _ in range(nline)]
         nword = [max(1,int(np.ceil(n))) for n in nword]
 
         lines = self.get_lines(nline, nword, nchar_max, f=0.35)
@@ -724,7 +724,7 @@ class TextSource(object):
 
         # get number of words:
         nword = [self.p_para_nword[2]*sstat.beta.rvs(a=self.p_para_nword[0], b=self.p_para_nword[1])
-                 for _ in xrange(nline)]
+                 for _ in range(nline)]
         nword = [max(1,int(np.ceil(n))) for n in nword]
 
         lines = self.get_lines(nline, nword, nchar_max, f=0.35)

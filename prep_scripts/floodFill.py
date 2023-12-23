@@ -17,7 +17,7 @@ import traceback, sys
 
 def get_seed(sx,sy,ucm):
     n = sx.size
-    for i in xrange(n):
+    for i in range(n):
         if ucm[sx[i]+1,sy[i]+1] == 0:
             return (sy[i],sx[i])
 

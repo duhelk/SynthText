@@ -28,22 +28,22 @@ def viz_textbb(text_im, charBB_list, wordBB, alpha=1.0):
     H,W = text_im.shape[:2]
 
     # plot the character-BB:
-    for i in xrange(len(charBB_list)):
+    for i in range(len(charBB_list)):
         bbs = charBB_list[i]
         ni = bbs.shape[-1]
-        for j in xrange(ni):
+        for j in range(ni):
             bb = bbs[:,:,j]
             bb = np.c_[bb,bb[:,0]]
             plt.plot(bb[0,:], bb[1,:], 'r', alpha=alpha/2)
 
     # plot the word-BB:
-    for i in xrange(wordBB.shape[-1]):
+    for i in range(wordBB.shape[-1]):
         bb = wordBB[:,:,i]
         bb = np.c_[bb,bb[:,0]]
         plt.plot(bb[0,:], bb[1,:], 'g', alpha=alpha)
         # visualize the indiv vertices:
         vcol = ['r','g','b','k']
-        for j in xrange(4):
+        for j in range(4):
             plt.scatter(bb[0,j],bb[1,j],color=vcol[j])        
 
     plt.gca().set_xlim([0,W-1])

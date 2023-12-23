@@ -17,21 +17,20 @@ A = np.c_[ys, np.ones_like(ys)]
 xs = []
 models = {}  # linear model
 
-FS = FontState()
-# plt.figure()
-# plt.hold(True)
+FS = FontState(data_dir='./support_en')
+#plt.figure()
 for i in range(len(FS.fonts)):
-    font = freetype.Font(FS.fonts[i], size=12)
-    h = []
-    for y in ys:
-        h.append(font.get_sized_glyph_height(y))
-    h = np.array(h)
-    m, _, _, _ = np.linalg.lstsq(A, h)
-    models[font.name] = m
-    print("{}:\t{}".format(i, font.name))
-    xs.append(h)
+	print (i)
+	font = freetype.Font(FS.fonts[i], size=12)
+	h = []
+	for y in ys:
+		h.append(font.get_sized_glyph_height(y.astype(float)))
+	h = np.array(h)
+	m,_,_,_ = np.linalg.lstsq(A,h)
+	models[font.name] = m
+	xs.append(h)
 
-with open('font_px2pt.cp', 'w') as f:
-    cp.dump(models, f)
-# plt.plot(xs,ys[i])
-# plt.show()
+with open('./support_en/models/font_px2pt.cp','wb') as f:
+	cp.dump(models,f)
+#plt.plot(xs,ys[i])
+#plt.show()

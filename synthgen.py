@@ -217,7 +217,7 @@ def get_text_placement_mask(xyz,mask,plane,pad=2,viz=False):
     """
     contour,hier = cv2.findContours(mask.copy().astype('uint8'),
                                     mode=cv2.RETR_CCOMP,
-                                    method=cv2.CHAIN_APPROX_SIMPLE)
+                                    method=cv2.CHAIN_APPROX_SIMPLE)[-2:]
     contour = [np.squeeze(c).astype('float') for c in contour]
     #plane = np.array([plane[1],plane[0],plane[2],plane[3]])
     H,W = mask.shape[:2]
@@ -349,7 +349,6 @@ def viz_textbb(fignum,text_im, bb_list,alpha=1.0):
     plt.close(fignum)
     plt.figure(fignum)
     plt.imshow(text_im)
-    plt.hold(True)
     H,W = text_im.shape[:2]
     for i in range(len(bb_list)):
         bbs = bb_list[i]
@@ -364,7 +363,7 @@ def viz_textbb(fignum,text_im, bb_list,alpha=1.0):
 
 class RendererV3(object):
 
-    def __init__(self, data_dir, max_time=None, lang="ENG"):
+    def __init__(self, data_dir, max_time=None, lang="EN"):
         self.text_renderer = tu.RenderFont(data_dir, lang)
         self.colorizer = Colorize(data_dir)
         #self.colorizerV2 = colorV2.Colorize(data_dir)
@@ -578,6 +577,47 @@ class RendererV3(object):
         return wordBB
 
 
+    # def char2wordBB(self, charBB, text):
+    #     """
+    #     Converts character bounding-boxes to word-level
+    #     bounding-boxes.
+
+    #     charBB : 2x4xn matrix of BB coordinates
+    #     text   : the text string
+
+    #     output : 2x4xm matrix of BB coordinates,
+    #              where, m == number of words.
+    #     """
+    #     wrds = text.split()
+    #     bb_idx = np.r_[0, np.cumsum([len(w) for w in wrds])]
+    #     wordBB = np.zeros((2,4,len(wrds)), 'float32')
+        
+    #     for i in range(len(wrds)):
+    #         cc = charBB[:,:,bb_idx[i]:bb_idx[i+1]]
+
+    #         # fit a rotated-rectangle:
+    #         # change shape from 2x4xn_i -> (4*n_i)x2
+    #         cc = np.squeeze(np.concatenate(np.dsplit(cc,cc.shape[-1]),axis=1)).T.astype('float32')
+    #         rect = cv2.minAreaRect(cc.copy())
+    #         box = np.array(cv2.boxPoints(rect))
+
+    #         # find the permutation of box-coordinates which
+    #         # are "aligned" appropriately with the character-bb.
+    #         # (exhaustive search over all possible assignments):
+    #         cc_tblr = np.c_[cc[0,:],
+    #                         cc[-3,:],
+    #                         cc[-2,:],
+    #                         cc[3,:]].T
+    #         perm4 = np.array(list(itertools.permutations(np.arange(4))))
+    #         dists = []
+    #         for pidx in range(perm4.shape[0]):
+    #             d = np.sum(np.linalg.norm(box[perm4[pidx],:]-cc_tblr,axis=1))
+    #             dists.append(d)
+    #         wordBB[:,:,i] = box[perm4[np.argmin(dists)],:].T
+
+    #     return wordBB
+
+
     def render_text(self,rgb,depth,seg,area,label,ninstance=1,viz=False):
         """
         rgb   : HxWx3 image rgb values (uint8)
@@ -629,7 +669,7 @@ class RendererV3(object):
         for i in range(ninstance):
             place_masks = copy.deepcopy(regions['place_mask'])
 
-            print(colorize(Color.CYAN, " ** instance # : %d"%i))
+            print (colorize(Color.CYAN, " ** instance # : %d"%i))
 
             idict = {'img':[], 'charBB':None, 'wordBB':None, 'txt':None}
 

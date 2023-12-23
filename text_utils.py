@@ -18,7 +18,6 @@ from PIL import Image
 import math
 from common import *
 import codecs
-from logger import logger
 
 import nltk, re, pprint
 from nltk import word_tokenize, sent_tokenize
@@ -29,7 +28,7 @@ from nltk.corpus.reader.chasen import *
 import subprocess
 
 def sample_weighted(p_dict):
-    ps = p_dict.keys()
+    ps = list(p_dict.keys())
     return p_dict[np.random.choice(ps,p=ps)]
 
 def move_bb(bbs, t):
@@ -91,7 +90,7 @@ class RenderFont(object):
         Also, outputs ground-truth bounding boxes and text string
     """
 
-    def __init__(self, data_dir='data', lang="ENG"):
+    def __init__(self, data_dir='data', lang="EN"):
         # distribution over the type of text:
         # whether to get a single word, paragraph or a line:
         self.p_text = {0.0 : 'WORD',
@@ -112,9 +111,14 @@ class RenderFont(object):
         self.p_curved = 1.0
         self.baselinestate = BaselineState()
 
+        if lang == 'EN':
+            fn=osp.join(data_dir,'newsgroup/newsgroup_en.txt')
+        elif lang == 'JP':
+            fn=osp.join(data_dir,'newsgroup/newsgroup_jp.txt')
+
         # text-source : gets english text:
         self.text_source = TextSource(min_nchar=self.min_nchar,
-                                      fn=osp.join(data_dir,'newsgroup/newsgroup.txt'),
+                                      fn=fn,
                                       lang=lang)
 
         # get font-state object:
@@ -376,7 +380,7 @@ class RenderFont(object):
 
             # sample text:
             text_type = sample_weighted(self.p_text)
-            text = self.text_source.sample(nline,nchar,text_type)
+            text = self.text_source.sample(nline,nchar,'WORD')
 
             if len(text)==0 or np.any([len(line)==0 for line in text]):
                 continue
@@ -432,11 +436,19 @@ class FontState(object):
 
         # get character-frequencies in the English language:
         with open(char_freq_path,'rb') as f:
-            self.char_freq = cp.load(f)
+            #self.char_freq = cp.load(f)
+            u = pickle._Unpickler(f)
+            u.encoding = 'latin1'
+            p = u.load()
+            self.char_freq = p
 
         # get the model to convert from pixel to font pt size:
         with open(font_model_path,'rb') as f:
-            self.font_model = cp.load(f, encoding='latin1')
+            #self.font_model = cp.load(f)
+            u = pickle._Unpickler(f)
+            u.encoding = 'latin1'
+            p = u.load()
+            self.font_model = p
 
         # get the names of fonts to use:
         self.FONT_LIST = osp.join(data_dir, 'fonts/fontlist.txt')
@@ -534,7 +546,7 @@ class TextSource(object):
         {"from": ord(u"\U0002b820"), "to": ord(u"\U0002ceaf")}  # included as of Unicode 8.0
     ]
 
-    def __init__(self, min_nchar, fn, lang="ENG"):
+    def __init__(self, min_nchar, fn, lang="EN"):
         """
         TXT_FN : path to file containing text data.
         """
@@ -544,41 +556,32 @@ class TextSource(object):
                       'PARA':self.sample_para}
         self.lang = lang
         # parse English text
-        if self.lang == "ENG":
-            corpus = PlaintextCorpusReader("./",
-                                         fn)
+        if self.lang == "EN":
+            print('===========', fn, os.path.exists(fn))
+            
+            corpus = PlaintextCorpusReader('./', fn)
 
             self.words = corpus.words()
             self.sents = corpus.sents()
             self.paras = corpus.paras()
 
         # parse Japanese text
-        elif self.lang == "JPN":
+        elif self.lang == "JP":
 
             # convert fs into chasen file
             _, ext = os.path.splitext(os.path.basename(fn))
             fn_chasen = fn.replace(ext, ".chasen")
-            print("Convert {} into {}".format(fn, fn_chasen))
+            print ("Convert {} into {}".format(fn, fn_chasen))
 
             cmd = "mecab -Ochasen {} > {}".format(fn, fn_chasen)
-            print("The following cmd below was executed to convert into chasen (for Japanese)")
-            print("\t{}".format(cmd))
+            print ("The following cmd below was executed to convert into chasen (for Japanese)")
+            print ("\t{}".format(cmd))
             p = subprocess.call(cmd, shell=True)
             data = ChasenCorpusReader('./', fn_chasen, encoding='utf-8')
 
             self.words = data.words()
             self.sents = data.sents()
             self.paras = data.paras()
-
-            # jp_sent_tokenizer = nltk.RegexpTokenizer(u'[^　「」！？。]*[！？。]')
-            # jp_chartype_tokenizer = nltk.RegexpTokenizer(u'([ぁ-んー]+|[ァ-ンー]+|[\u4e00-\u9FFF]+|[^ぁ-んァ-ンー\u4e00-\u9FFF]+)')
-            #
-            # corpus = PlaintextCorpusReader("./",
-            #                              fn,
-            #                              encoding='utf-8',
-            #                              para_block_reader=read_line_block,
-            #                              sent_tokenizer=jp_sent_tokenizer,
-            #                              word_tokenizer=jp_chartype_tokenizer)
 
         # distribution over line/words for LINE/PARA:
         self.p_line_nline = np.array([0.85, 0.10, 0.05])
@@ -597,10 +600,10 @@ class TextSource(object):
         T/F return : T iff fraction of symbol/special-charcters in
                      txt is less than or equal to f (default=0.25).
         """
-        if self.lang == "ENG":
+        if self.lang == "EN":
             return np.sum([not ch.isalnum() for ch in txt]) / (len(txt) + 0.0) <= f
 
-        elif self.lang == "JPN":
+        elif self.lang == "JP":
             chcnt = 0
             line = txt  # .decode('utf-8')
             for ch in line:
@@ -645,7 +648,6 @@ class TextSource(object):
         return lines
 
     def get_lines(self, nline, nword, nchar_max, f=0.35, niter=100):
-
         def h_lines(niter=100):
             lines = ['']
             iter = 0
@@ -653,6 +655,8 @@ class TextSource(object):
                 iter += 1
                 line_start = np.random.choice(len(self.sents)-nline)
                 lines = [self.sents[line_start+i] for i in range(nline)]
+            
+            #lines = [ " ".join(line) for line in lines]
             return lines
 
         lines = ['']
@@ -668,6 +672,8 @@ class TextSource(object):
                 if dw > 0:
                     first_word_index = random.choice(range(dw+1))
                     lines[i] = ' '.join(words[first_word_index:first_word_index+nword[i]])
+                else:
+                    lines[i] = ' '.join(words)
 
                 while len(lines[i]) > nchar_max: #chop-off characters from end:
                     if not np.any([ch.isspace() for ch in lines[i]]):
@@ -684,15 +690,17 @@ class TextSource(object):
         return self.fdict[kind](nline_max,nchar_max)
 
     def sample_word(self,nline_max,nchar_max,niter=100):
-        rand_line = self.sents[np.random.choice(len(self.sents))]
-        words = rand_line.split()
-        rand_word = random.choice(words)
+        #rand_line = self.sents[np.random.choice(len(self.sents))]
+        #words = rand_line #.split()
+        #rand_word = random.choice(words)
+        rand_word = random.choice(self.words)
 
         iter = 0
         while iter < niter and (not self.is_good([rand_word])[0] or len(rand_word)>nchar_max):
-            rand_line = self.txt[np.random.choice(len(self.sents))]
-            words = rand_line.split()
-            rand_word = random.choice(words)
+            # rand_line = self.txt[np.random.choice(len(self.sents))]
+            # words = rand_line.split()
+            # rand_word = random.choice(words)
+            rand_word = random.choice(self.words)
             iter += 1
 
         if not self.is_good([rand_word])[0] or len(rand_word)>nchar_max:

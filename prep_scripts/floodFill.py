@@ -41,7 +41,7 @@ def get_mask(ucm,viz=False):
         sx,sy = np.where(mask==0)
         seed = get_seed(sx,sy,ucm)
         i += 1
-    print "  > terminated in %d steps"%i
+    print ("  > terminated in %d steps"%i)
 
     if viz:
         plt.imshow(mask)
@@ -62,7 +62,7 @@ def process_db_parallel(base_dir, th=0.11):
     Get segmentation masks from gPb contours.
     """
     db_path = osp.join(base_dir,'ucm.mat')
-    out_path = osp.join(base_dir,'seg_uint16.h5')
+    out_path = osp.join(base_dir,'seg.h5')
     # output h5 file:
     dbo = h5py.File(out_path,'w')
     dbo_mask = dbo.create_group("mask")
@@ -73,15 +73,23 @@ def process_db_parallel(base_dir, th=0.11):
             self.ucm_h5 = h5py.File(db_path,'r')
             self.N = self.ucm_h5['names'].size
             self.i = 0
+            print('======', self.ucm_h5['names'])
 
         def __iter__(self):
             return self
 
+        # def get_imname(self,i):
+        #     print(self.ucm_h5[self.ucm_h5['names'][0,self.i]][:])
+        #     return ''
+
         def get_imname(self,i):
-            return "".join(map(chr, self.ucm_h5[self.ucm_h5['names'][0,self.i]][:]))
+            name = np.ndarray.tolist(self.ucm_h5[self.ucm_h5['names'][0,self.i]][:])
+            name =  [chr(x[0]) for x in name]
+            return "".join(name)
+            #return "".join(map(str, self.ucm_h5[self.ucm_h5['names'][0,self.i]][:]))
 
         def __stop__(self):
-            print "DONE"
+            print ("DONE")
             self.ucm_h5.close()
             raise StopIteration
 
@@ -99,34 +107,40 @@ def process_db_parallel(base_dir, th=0.11):
 
             return imname
 
-        def next(self):
+        def __next__(self):
             imname = self.get_valid_name()
-            print "%d of %d"%(self.i+1,self.N)
+            print ("%d of %d"%(self.i+1,self.N))
             ucm = self.ucm_h5[self.ucm_h5['ucms'][0,self.i]][:]
             ucm = ucm.copy()
             self.i += 1
             return ((ucm>self.th).astype('uint8'),imname)
+        
+        def next(self):
+            return self.__next__()
 
     ucm_iter = ucm_iterable(db_path,th)
-    print "cpu count: ", mp.cpu_count()
-    parpool = mp.Pool(4)
-    ucm_result = parpool.imap_unordered(get_mask_parallel, ucm_iter, chunksize=1)
+    print(type(ucm_iter))
+    print ("cpu count: ", mp.cpu_count())
+    #parpool = mp.Pool(4)
+    #ucm_result = parpool.imap_unordered(get_mask_parallel, ucm_iter, chunksize=1)
 
-    for res in ucm_result:
+    #for res in ucm_result:
+    for iter in ucm_iter:
+        res = get_mask_parallel(iter)
         if res is None:
             continue
         ((mask,area,label),imname) = res
-        print "got back : ", imname
+        print ("got back : ", imname)
         mask = mask.astype('uint16')
         mask_dset = dbo_mask.create_dataset(imname, data=mask)
         mask_dset.attrs['area'] = area
         mask_dset.attrs['label'] = label
 
     # close the h5 files:
-    print "closing DB"
+    print ("closing DB")
     dbo.close()
-    print ">>>> DONE"
+    print (">>>> DONE")
 
 
-base_dir = '/home/' # directory containing the ucm.mat, i.e., output of run_ucm.m
+base_dir = '/media/HD2/Workspace/Phase2/SynthData/openimages/tower/' # directory containing the ucm.mat, i.e., output of run_ucm.m
 process_db_parallel(base_dir)
